@@ -1,0 +1,30 @@
+# Node.js
+node_modules/
+dist/
+build/
+coverage/
+
+# Variables de entorno y secretos
+.env
+.env.*
+*.key
+*.pem
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Logs y archivos temporales
+*.log
+tmp/
+temp/
+
+# Configuración local del editor
+.vscode/
+.idea/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+Desktop.ini
