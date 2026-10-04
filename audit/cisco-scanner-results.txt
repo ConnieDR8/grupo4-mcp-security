@@ -1,40 +1,82 @@
-=== MCP Scanner Detailed Results ===
+# Cisco AI Defense MCP Scanner — Resultados
+# Fecha: 2026-10-04 13:48:44
+# Comando: mcp-scanner --format detailed static --tools evidence/tools-definition.json
+# Nota: "Server URL: mcp.deepwiki.com" es el target DEFAULT de la herramienta;
+#       el escaneo real fue sobre: evidence/tools-definition.json (4 tools del Grupo 4)
+# Advertencias esperadas: LLM y API analyzers desactivados (sin API key) — solo YARA activo
+# =====================================================================================
+Warning: LLM analyzer requested but MCP_SCANNER_LLM_API_KEY not set
+Warning: API analyzer requested but MCP_SCANNER_API_KEY not set
 
-Scan Target: https://mcp.deepwiki.com/mcp
+=== MCP Scanner Results ===
 
-Tool 1: saludar
-Status: completed
-Safe: Yes
-Analyzer Results:
-  � yara_analyzer:
-    - Severity: SAFE
-    - Threat Summary: No threats detected
-    - Threat Names: None
-    - Total Findings: 0
+Server URL: https://mcp.deepwiki.com/mcp
+Tools scanned: 4
+Safe tools: 3
+Unsafe tools: 1
+Incomplete tools: 0
 
-Tool 2: borrar_base_datos_clientes
-Status: completed
-Safe: Yes
-Analyzer Results:
-  � yara_analyzer:
-    - Severity: SAFE
-    - Threat Summary: No threats detected
-    - Threat Names: None
-    - Total Findings: 0
+=== Detalle por Tool ===
 
-Tool 3: leer_registro_sistema
-Status: completed
-Safe: No
-Analyzer Results:
-  � yara_analyzer:
-    - Severity: HIGH
-    - Threat Summary: Detected 1 threat: system manipulation
-    - Threat Names: SYSTEM MANIPULATION
-    - Total Findings: 1
-    - MCP Taxonomy:
-      � AITech: AITech-9.1
-      � AITech Name: Model or Agentic System Manipulation
-      � AISubtech: AISubtech-9.1.2
-      � AISubtech Name: Unauthorized or Unsolicited System Access
-      � Description: Manipulating or accessing underlying system resources without authorization, lea...
+1. saludar
+   Status: completed
+   Safe: Yes
+   Analyzer Results:
+     yara_analyzer:
+       - Severity: SAFE
+       - Threat Summary: No threats detected
+       - Total Findings: 0
 
+2. borrar_base_datos_clientes
+   Status: completed
+   Safe: Yes
+   Analyzer Results:
+     yara_analyzer:
+       - Severity: SAFE
+       - Threat Summary: No threats detected
+       - Total Findings: 0
+   >> NOTA DEL EQUIPO: Esta tool contiene el Authorization Bypass (H-02, CRÍTICO
+      en SlowMist). YARA no evalúa lógica de negocio/autorización, solo patrones
+      de código conocidos — por eso no dispara ningún hallazgo aquí.
+
+3. leer_registro_sistema
+   Status: completed
+   Safe: No
+   Analyzer Results:
+     yara_analyzer:
+       - Severity: HIGH
+       - Threat Summary: Detected 1 threat: system manipulation
+       - Threat Names: SYSTEM MANIPULATION
+       - Total Findings: 1
+       - MCP Taxonomy:
+         AITech: AITech-9.1
+         AITech Name: Model or Agentic System Manipulation
+         AISubtech: AISubtech-9.1.2
+         AISubtech Name: Unauthorized or Unsolicited System Access
+         Description: Manipulating or accessing underlying system resources without
+         authorization, leading to data exposure or system compromise.
+   >> NOTA DEL EQUIPO: La etiqueta "System Manipulation" es genérica; nuestro
+      análisis manual (SlowMist, control 1.1) la especifica correctamente como
+      Path Traversal / Arbitrary File Read.
+
+4. diagnostico_servidor
+   Status: completed
+   Safe: Yes
+   Analyzer Results:
+     yara_analyzer:
+       - Severity: SAFE
+       - Threat Summary: No threats detected
+       - Total Findings: 0
+   >> NOTA DEL EQUIPO: Esta tool contiene la Injection simulada (H-03, CRÍTICO
+      en SlowMist). El código simulado no ejecuta `exec()` real ni contiene
+      patrones de shell injection que el YARA reconozca, por lo que pasa como
+      segura pese a tener la vulnerabilidad de concatenación sin sanitizar.
+
+=== Conclusión del equipo ===
+
+De los 3 hallazgos críticos identificados manualmente (H-01, H-02, H-03),
+Cisco MCP Scanner solo detectó 1 (H-01, Path Traversal). Los otros dos
+(Authorization Bypass y Injection) requieren análisis de lógica de negocio
+que un escáner estático basado en YARA no puede realizar. Esto confirma
+que el análisis automatizado y la auditoría manual (SlowMist) son
+complementarios, no sustitutos.
