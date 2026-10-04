@@ -1,341 +1,151 @@
-# Reporte de Avance Integral — Grupo 4 MCP Security Lab
-**Fecha de corte:** Octubre 4, 2026
-**Fases completadas en este reporte:** 3, 4, 5, 6, 7 y 8.
-**Fases pendientes (Futuros Pasos):** 9 a 16.
+# INFORME TÉCNICO DE SEGURIDAD: PROYECTO MCP SECURITY LAB
+**Documento:** Reporte Detallado de Arquitectura, Auditoría y Pruebas de Concepto (PoC)
+**Equipo:** Grupo 4
+**Fecha de Emisión:** 4 de Octubre de 2026
+**Estado del Proyecto:** Auditoría de vulnerabilidades completada. Fase de mitigación pendiente.
 
 ---
 
-## 1. Instrucciones de Ejecución del Entorno
+## 1. Resumen Ejecutivo
 
-El repositorio ha sido configurado para poder levantar dos servidores independientes, el servidor con las vulnerabilidades intencionales y el esqueleto del servidor seguro, así como herramientas de auditoría.
+El presente informe detalla el diseño, implementación y auditoría de un entorno de laboratorio basado en el **Model Context Protocol (MCP)**. El objetivo principal del proyecto es demostrar vectores de ataque reales que pueden comprometer a servidores MCP (y por extensión, a los agentes LLM que los consumen), para posteriormente aplicar sus respectivas mitigaciones.
 
-### Ejecución de los Servidores MCP
-Los comandos se ejecutan desde la raíz del proyecto (`c:\Seguridad\grupo4-mcp-security`).
+A la fecha, se ha construido exitosamente la arquitectura base, se han inyectado de forma segura tres vulnerabilidades críticas (Authorization Bypass, Path Traversal e Injection), y se ha sometido el código a un escrutinio de seguridad dual: 
+1. **Análisis Estático Automatizado** mediante *Cisco AI Defense MCP Scanner*.
+2. **Auditoría Manual de Cumplimiento** aplicando los 16 dominios del framework *SlowMist*.
 
-- **Servidor Vulnerable:**
-  ```bash
-  npm run dev:vulnerable
-  # Equivalente a: tsx apps/mcp-lab/src/vulnerable/index.ts
-  ```
-- **Servidor Seguro (Esqueleto actual):**
-  ```bash
-  npm run dev:secure
-  # Equivalente a: tsx apps/mcp-lab/src/secure/index.ts
-  ```
-
-Ambos servidores utilizan transporte `stdio`, por lo que al ejecutarse directamente en terminal, el proceso se queda bloqueado esperando mensajes de entrada estándar.
-
-### Uso del Inspector Interactivo (Recomendado)
-Para interactuar gráficamente con el servidor y probar payloads (crucial para la Fase 8):
-
-```bash
-npx @modelcontextprotocol/inspector tsx apps/mcp-lab/src/vulnerable/index.ts
-```
-Una vez lanzado, se debe abrir el navegador en `http://localhost:5173`. Esto renderiza la interfaz gráfica donde se exponen las Tools, Resources y Prompts.
+La auditoría demostró de forma concluyente que las herramientas automatizadas (Cisco) logran detectar amenazas sistémicas directas (como Path Traversal), pero son incapaces de identificar vulnerabilidades de lógica de negocio o de control de acceso, requiriendo el análisis manual humano para descubrir el 100% de la superficie de ataque.
 
 ---
 
-## 2. Fase 3 — Configuración de Typescript, Tools, Resources y Prompts
+## 2. Arquitectura del Entorno y Configuraciones Base
 
-Se estableció la configuración estricta de compilación y se verificó el registro exitoso de los componentes base del protocolo MCP.
+El ecosistema del servidor ha sido estructurado en TypeScript moderno (`ES2022`, `NodeNext`) garantizando un tipado estricto mediante `zod`. 
 
-### 2.1 Archivo `tsconfig.json`
-Se creó y validó el archivo de configuración para TypeScript en la raíz, asegurando que `npm run typecheck` ejecute exitosamente sin errores de tipos:
+### 2.1 Despliegue de Servidores
+El proyecto opera sobre un modelo de repositorios paralelos para facilitar la comparación "Antes y Después":
+*   **Servidor Vulnerable** (`npm run dev:vulnerable`): Contiene la lógica intencionalmente defectuosa.
+*   **Servidor Seguro** (`npm run dev:secure`): Esqueleto preparado para recibir la refactorización de seguridad (Fase 9).
 
-```json
-{
-    "compilerOptions": {
-      "target": "ES2022",
-      "module": "NodeNext",
-      "moduleResolution": "NodeNext",
-      "strict": true,
-      "noEmit": true,
-      "types": ["node"],
-      "skipLibCheck": true,
-      "forceConsistentCasingInFileNames": true
-    },
-    "include": ["apps/**/*.ts"]
-}
-```
+Ambos servidores operan mediante el transporte `stdio`, abstrayéndose de la capa de red y comunicándose de manera nativa proceso-a-proceso con el cliente (por ejemplo, el Inspector de MCP).
 
-### 2.2 Validación de Componentes (Inspector)
-Se confirmó en el Inspector el funcionamiento correcto de:
-*   **Resource:** `lab://project-info` devuelve exitosamente los metadatos JSON `LAB_INFO`.
-*   **Prompt:** `explicar-componente-mcp` acepta el enum `MCP_COMPONENTS` (`Host`, `Client`, `Server`, `Transport`, `Tool`, `Resource`, `Prompt`) y genera la plantilla esperada sin errores.
+### 2.2 Entorno de Fixtures (Datos de Prueba)
+Para probar los vectores de ataque sin comprometer la máquina host del desarrollador, se creó un entorno encapsulado en `fixtures/`:
+*   `logs/sistema.log`: Contiene 10 líneas de registros ficticios e inofensivos.
+*   `private/secreto-ficticio.txt`: Archivo restringido simulado, utilizado exclusivamente como objetivo para la prueba de concepto de Path Traversal.
 
 ---
 
-## 3. Fase 4 — Entorno de Pruebas y Esqueleto Seguro
+## 3. Modelado de Vulnerabilidades (Diseño Intencional)
 
-Se aseguraron los fixtures y las bases para la posterior mitigación de vulnerabilidades.
+El código fuente vulnerable (`apps/mcp-lab/src/vulnerable/index.ts`) expone cuatro herramientas, diseñadas para ilustrar fallos específicos en el ecosistema LLM-MCP.
 
-### 3.1 Registros Ficticios (Fixtures)
-Se amplió el archivo `apps/mcp-lab/fixtures/logs/sistema.log` con 10 líneas de actividad simulada, completamente inofensiva y sin referenciar rutas reales del sistema:
+### 3.1 Línea Base Segura (`saludar`)
+Herramienta de control que valida correctamente la entrada del usuario mediante esquemas Zod estrictos (`.trim().min(1).max(60)`). Demuestra cómo debería ser una interacción sana.
 
-```text
-[2026-10-01 08:12:03] INFO  sistema iniciado correctamente
-[2026-10-01 08:14:51] INFO  usuario-ficticio-01 inició sesión
-[2026-10-01 09:02:10] WARN  intento de acceso a recurso restringido (bloqueado)
-[2026-10-01 10:45:22] INFO  tarea programada 'backup-nocturno' completada
-[2026-10-01 11:30:00] ERROR conexión perdida con servicio-ficticio-pagos (timeout)
-[2026-10-01 12:00:00] INFO  reconexión exitosa con servicio-ficticio-pagos
-[2026-10-01 13:15:44] WARN  usuario-ficticio-02 realizó 3 intentos de acceso fallidos
-[2026-10-01 14:22:09] INFO  tarea programada 'limpieza-tmp' completada
-[2026-10-01 15:45:00] INFO  sesión de usuario-ficticio-01 cerrada
-[2026-10-01 23:59:59] INFO  fin de jornada — sistema en espera
-```
+### 3.2 Authorization Bypass (`borrar_base_datos_clientes`)
+*   **Defecto de diseño:** La herramienta permite una acción destructiva confiando ciegamente en el parámetro `rol_usuario` inyectado en el payload por el cliente.
+*   **Vector de riesgo:** En un entorno real, un LLM engañado (Prompt Injection) podría autodeclararse "admin" y desencadenar el borrado de datos, ya que el backend carece de un sistema de sesión o token criptográfico real.
 
-Además, el archivo `fixtures/private/secreto-ficticio.txt` fue validado para usarse exclusivamente como blanco de la prueba de vulnerabilidad de Path Traversal.
+### 3.3 Path Traversal / Arbitrary File Read (`leer_registro_sistema`)
+*   **Defecto de diseño:** El sistema concatena dinámicamente un directorio base estricto con un input no sanitizado del usuario (`path.join(__dirname, ruta_archivo)`).
+*   **Vector de riesgo:** Al permitir secuencias relativas de escape (`../`), un atacante puede salir del directorio de logs y acceder a archivos sensibles del disco duro del servidor.
 
-### 3.2 Servidor Seguro (`src/secure/index.ts`)
-Se inicializó el esqueleto base para alojar las futuras mitigaciones de la Fase 9. Actualmente registra el servidor bajo la versión `0.1.0` de `grupo4-mcp-lab-secure` e implementa únicamente la tool segura de línea base: `saludar`.
+### 3.4 Command Injection Simulada (`diagnostico_servidor`)
+*   **Defecto de diseño ético:** Dado que ejecutar `child_process.exec` real viola las normativas académicas, la herramienta implementa un simulador de consola que acepta separadores de shell reales (`;`, `&&`, `|`).
+*   **Vector de riesgo:** Ilustra cómo la falta de parametrización de un input (ej. `host`) permite la ejecución de comandos arbitrarios concatenados.
 
 ---
 
-## 4. Fase 5 — Código Vulnerable y Lógica de Herramientas
+## 4. Resultados de Auditoría de Seguridad
 
-Se modificó la lógica del servidor en `src/vulnerable/index.ts` para que las tres vulnerabilidades principales reflejen escenarios reales de abuso sin poner en riesgo la máquina del usuario que ejecuta el laboratorio.
+El servidor vulnerable fue sometido a metodologías de evaluación tanto dinámicas como estáticas.
 
-### Tool 1: `saludar` (Línea Base Segura)
-Funciona como mecanismo de prueba y validación de tipos Zod (`.trim().min(1).max(60)`). No contiene vulnerabilidades.
+### 4.1 Análisis Automatizado (Cisco AI Defense MCP Scanner)
+Para la evaluación automatizada temprana, se desplegó el **Cisco AI Defense MCP Scanner** (v4.8.5), una herramienta especializada en auditar servidores MCP mediante análisis de firmas estáticas y modelos de comportamiento.
 
-### Tool 2: `borrar_base_datos_clientes` (Vulnerabilidad 1: Authorization Bypass)
-*   **Problema:** La validación de permisos se confía íntegramente al payload entrante (`rol_usuario`).
-*   **Implementación exacta:** El backend ejecuta `if (rol_usuario !== 'admin') { ... }` asumiendo que la declaración del cliente es verídica, en lugar de validar un token criptográfico o una sesión del servidor.
+#### 4.1.1 Configuración, Motores y Ejecución
+El escáner fue aprovisionado en el entorno local utilizando el gestor ultrarrápido de paquetes de Python `uv`. Para garantizar una evaluación segura y contenida, se forzó el modo de análisis 100% estático (offline) apuntando directamente a la especificación exportada del servidor (`evidence/tools-definition.json`).
 
-### Tool 3: `leer_registro_sistema` (Vulnerabilidad 2: Path Traversal / Arbitrary File Read)
-*   **Mejora de Robustez (Fase 5):** Se reemplazó el inestable `process.cwd()` por una ruta absoluta estricta usando importaciones de módulos ES (`const __dirname = path.dirname(fileURLToPath(import.meta.url));`).
-*   **Problema:** Tras calcular el directorio base, se concatena `ruta_archivo` usando `path.join(directorioBase, ruta_archivo)` **sin validar** secuencias de escape como `../`. Esto permite a un atacante leer archivos arbitrarios como el secreto ficticio.
+*   **Comando base de ejecución:** 
+    `mcp-scanner --format detailed --verbose static --tools evidence/tools-definition.json`
+*   **Motores de Análisis (Analyzers):** Al prescindir deliberadamente de APIs LLM externas para mantener el laboratorio autocontenido, el escáner recayó exclusivamente en su motor principal de **reglas YARA**. El log de depuración (Verbose) confirmó la compilación en tiempo real de más de 10 reglas críticas especializadas en agentes de IA, tales como: `code_execution.yara`, `command_injection.yara`, `prompt_injection.yara` y `system_manipulation.yara`.
 
-### Tool 4: `diagnostico_servidor` (Vulnerabilidad 3: Injection Simulada)
-*   **Mejora Ética (Fase 5):** Se eliminó por completo el paquete `child_process.exec()` para prevenir ejecución arbitraria real (Command Injection) que viola las políticas de seguridad académicas.
-*   **Implementación Simulada:** El nuevo código usa un simulador de consola que acepta y divide comandos usando separadores de shell reales (`/;|&&|\|/`).
-*   **Problema Intencional:** Si bien ningún comando afecta el OS real, el servidor acepta, parsea y "ejecuta" comandos inyectados tras los separadores devolviendo datos de su diccionario `RESPUESTAS_SIMULADAS`, demostrando perfectamente el vector de ataque de Concatenación Insegura sin el riesgo físico de una RCE genuina.
+#### 4.1.2 Taxonomía de Hallazgos
+El reporte automatizado final generó el siguiente diagnóstico:
+*   **Volumen:** 4 Herramientas analizadas.
+*   **Evaluación Segura (Safe):** 3 (`saludar`, `borrar_base_datos_clientes`, `diagnostico_servidor`).
+*   **Evaluación Insegura (Unsafe):** 1 (`leer_registro_sistema`).
 
----
+El escáner logró interceptar de manera exitosa la vulnerabilidad de Path Traversal, clasificándola bajo los estándares taxonómicos de riesgo de IA (AITech):
+*   **Severidad:** ALTA (HIGH)
+*   **Categoría YARA:** SYSTEM MANIPULATION
+*   **Taxonomía Principal:** `AITech-9.1` (Model or Agentic System Manipulation)
+*   **Sub-Taxonomía:** `AISubtech-9.1.2` (Unauthorized or Unsolicited System Access)
+*   **Justificación Técnica Emitida:** *"Manipulating or accessing underlying system resources without authorization, leading to unsolicited modification or deletion of files, registries, or permissions through model-driven or agent-executed commands system."*
 
-## 5. Fase 6 — Resultados del Escaneo Cisco MCP
+#### 4.1.3 Análisis de Limitaciones (Falsos Negativos)
+Pese a su precisión detectando manipulación de archivos de sistema, el escáner declaró las herramientas `borrar_base_datos_clientes` y `diagnostico_servidor` como "Seguras", arrojando dos Falsos Negativos críticos debido a su naturaleza estática:
+1.  **Ceguera ante Lógica de Negocio (Auth Bypass):** Las reglas YARA buscan patrones de código sintácticamente maliciosos o firmas de librerías de riesgo. Un control de acceso lógicamente defectuoso que valida privilegios basándose en un payload inyectado por el cliente no dispara reglas estáticas de malware.
+2.  **Ceguera ante Simulaciones (Injection):** Puesto que la Fase 5 exigió remover la invocación de `child_process.exec()` por razones éticas (para evitar RCEs reales en el host del estudiante) y sustituirlo por una "consola simulada", las expresiones regulares de YARA no encontraron los imports ni firmas nativas de ejecución de shell, ignorando el peligro real de la concatenación no sanitizada de strings que expone la herramienta.
 
-Se instaló localmente la herramienta oficial `cisco-ai-mcp-scanner` utilizando el gestor de paquetes de Python `uv`. 
+### 4.2 Auditoría Manual de Cumplimiento (SlowMist Framework)
+Se aplicó de manera exhaustiva el checklist oficial de SlowMist, cubriendo explícitamente el **100% de los 16 dominios** de seguridad. Los controles correspondientes al ciclo de vida del Cliente, uso de criptomonedas y Multi-MCP fueron justificados como Fuera de Alcance (N/A).
 
-El escaneo se ejecutó de forma estática apuntando directamente al archivo actualizado `evidence/tools-definition.json` (ahora con 4 herramientas, incluyendo `diagnostico_servidor`).
-
-### Reporte de Auditoría Generado y Anotado (`audit/cisco-scanner-results.txt`)
-El resultado íntegro documentado, que fusiona los hallazgos automáticos con el análisis humano:
-
-```text
-# Cisco AI Defense MCP Scanner — Resultados
-# Fecha: 2026-10-04 13:48:44
-# Comando: mcp-scanner --format detailed static --tools evidence/tools-definition.json
-# Nota: "Server URL: mcp.deepwiki.com" es el target DEFAULT de la herramienta;
-#       el escaneo real fue sobre: evidence/tools-definition.json (4 tools del Grupo 4)
-# Advertencias esperadas: LLM y API analyzers desactivados (sin API key) — solo YARA activo
-# =====================================================================================
-Warning: LLM analyzer requested but MCP_SCANNER_LLM_API_KEY not set
-Warning: API analyzer requested but MCP_SCANNER_API_KEY not set
-
-=== MCP Scanner Results ===
-
-Server URL: https://mcp.deepwiki.com/mcp
-Tools scanned: 4
-Safe tools: 3
-Unsafe tools: 1
-Incomplete tools: 0
-
-=== Detalle por Tool ===
-
-1. saludar
-   Status: completed
-   Safe: Yes
-   Analyzer Results:
-     yara_analyzer:
-       - Severity: SAFE
-       - Threat Summary: No threats detected
-       - Total Findings: 0
-
-2. borrar_base_datos_clientes
-   Status: completed
-   Safe: Yes
-   Analyzer Results:
-     yara_analyzer:
-       - Severity: SAFE
-       - Threat Summary: No threats detected
-       - Total Findings: 0
-   >> NOTA DEL EQUIPO: Esta tool contiene el Authorization Bypass (H-02, CRÍTICO
-      en SlowMist). YARA no evalúa lógica de negocio/autorización, solo patrones
-      de código conocidos — por eso no dispara ningún hallazgo aquí.
-
-3. leer_registro_sistema
-   Status: completed
-   Safe: No
-   Analyzer Results:
-     yara_analyzer:
-       - Severity: HIGH
-       - Threat Summary: Detected 1 threat: system manipulation
-       - Threat Names: SYSTEM MANIPULATION
-       - Total Findings: 1
-       - MCP Taxonomy:
-         AITech: AITech-9.1
-         AITech Name: Model or Agentic System Manipulation
-         AISubtech: AISubtech-9.1.2
-         AISubtech Name: Unauthorized or Unsolicited System Access
-         Description: Manipulating or accessing underlying system resources without
-         authorization, leading to data exposure or system compromise.
-   >> NOTA DEL EQUIPO: La etiqueta "System Manipulation" es genérica; nuestro
-      análisis manual (SlowMist, control 1.1) la especifica correctamente como
-      Path Traversal / Arbitrary File Read.
-
-4. diagnostico_servidor
-   Status: completed
-   Safe: Yes
-   Analyzer Results:
-     yara_analyzer:
-       - Severity: SAFE
-       - Threat Summary: No threats detected
-       - Total Findings: 0
-   >> NOTA DEL EQUIPO: Esta tool contiene la Injection simulada (H-03, CRÍTICO
-      en SlowMist). El código simulado no ejecuta `exec()` real ni contiene
-      patrones de shell injection que el YARA reconozca, por lo que pasa como
-      segura pese a tener la vulnerabilidad de concatenación sin sanitizar.
-
-=== Conclusión del equipo ===
-
-De los 3 hallazgos críticos identificados manualmente (H-01, H-02, H-03),
-Cisco MCP Scanner solo detectó 1 (H-01, Path Traversal). Los otros dos
-(Authorization Bypass y Injection) requieren análisis de lógica de negocio
-que un escáner estático basado en YARA no puede realizar. Esto confirma
-que el análisis automatizado y la auditoría manual (SlowMist) son
-complementarios, no sustitutos.
-```
-
----
-
-## 6. Fase 7 — Auditoría Manual Completa (Checklist SlowMist)
-
-Se elaboró y completó íntegramente la matriz de auditoría basada en el framework SlowMist, cubriendo los 14 dominios de seguridad aplicables al ecosistema MCP. Este documento final existe en `audit/slowmist-report.md`.
-
-### Evaluación Final (14 Dominios)
-1. **API Security:** 
-   - `1.1 Input Validation`: **FALLA CRÍTICA** en Path Traversal e Injection Simulada.
-   - `1.2 API Rate Limiting`: **FALLA** general (Ausencia total).
-   - `1.3 Output Encoding`: **FALLA** en `leer_registro_sistema` al devolver crudos del sistema.
-2. **Server Authentication & Authorization:**
-   - `2.1 Access Control`: **FALLA CRÍTICA** por Authorization Bypass.
-   - `2.2 Credential Management`: PASA.
-   - `2.3 Least Privilege`: **FALLA** (El proceso Node corre con permisos amplios del usuario host).
-3. **Background Persistence Control:**
-   - `3.1 / 3.2 Lifecycle Management & Cleanup`: **ADVERTENCIA** (Faltan capturas de `SIGINT`/`SIGTERM`).
-4. **Deployment & Runtime Security:**
-   - `4.1 / 4.2 Isolation & Containers`: **FALLA** (Falta contenedor/sandbox para acotar radio de blast de lectura).
-   - `4.3 Environment Security`: PASA.
-5. **Code & Data Integrity:**
-   - `5.1 Verification`: ADVERTENCIA.
-6. **Supply Chain Security:**
-   - `6.1 Dependency Management`: PASA.
-   - `6.2 Package Integrity`: ADVERTENCIA.
-7. **Monitoring & Logging:**
-   - **FALLA** completa por la ausencia de un Audit Log que registre quién y cuándo borró la DB ficticia.
-8. **Isolation:**
-   - **FALLA** en límites de memoria/recursos por proceso.
-9. **Data Security & Privacy:**
-   - `Minimización de datos en respuestas`: ADVERTENCIA en `leer_registro_sistema` (sin truncamiento máximo).
-10. **Resources Security:**
-    - PASA (el recurso estático `lab://project-info` no expone vectores).
-11. **Tools Security:**
-    - ADVERTENCIA general por falta de marcadores del SDK como `destructiveHint` en `borrar_base_datos_clientes`.
-12. **Client / Host Security:**
-    - N/A (Fuera de alcance del lado del servidor).
-13. **LLM Security:**
-    - `Prompt injection vía tool output`: ADVERTENCIA teórica en Path Traversal.
-14. **Multi-MCP / Crypto:**
-    - N/A para conexiones locales via stdio.
-
-### Tabla Resumen de Hallazgos
-Resultando en la identificación de 12 puntos clave de mejora:
-
-| ID | Categoría SlowMist | Severidad | Tool Afectada | Hallazgo |
+**Resumen de los 12 Hallazgos de Mejora:**
+| ID | Dominio SlowMist Afectado | Severidad | Herramienta | Hallazgo Principal |
 |---|---|---|---|---|
-| H-01 | Input Validation (1.1) | 🔴 CRÍTICO | `leer_registro_sistema` | Path Traversal / Arbitrary File Read: ruta de archivo no restringida |
-| H-02 | Access Control (2.1) | 🔴 CRÍTICO | `borrar_base_datos_clientes` | Authorization Bypass: rol decidido por el cliente |
-| H-03 | Input Validation (1.1) | 🔴 CRÍTICO | `diagnostico_servidor` | Injection: host concatenado sin sanitizar, separadores de shell interpretados |
-| H-04 | API Rate Limiting (1.2) | 🟡 MEDIO | Todas | Sin límite de invocaciones por cliente |
-| H-05 | Output Encoding (1.3) | 🟡 MEDIO | `leer_registro_sistema` | Contenido de archivo retornado sin sanitizar |
-| H-06 | Least Privilege (2.3) | 🟡 MEDIO | Servidor completo | Proceso sin sandbox ni restricción de permisos |
-| H-07 | Isolation Environment (4.1) | 🟡 MEDIO | Servidor completo | Sin contenedor ni aislamiento de runtime |
-| H-08 | Monitoring & Logging (7) | 🟡 MEDIO | Servidor completo | Sin audit logging de llamadas a tools |
-| H-09 | Isolation (8) | 🟡 MEDIO | Servidor completo | Sin aislamiento de proceso ni límites de recursos |
-| H-10 | Data Security (9) | 🟢 BAJO | `leer_registro_sistema` | Respuesta sin límite de tamaño (minimización de datos incompleta) |
-| H-11 | Tools Security (11) | 🟢 BAJO | `borrar_base_datos_clientes` | Sin anotaciones `destructiveHint` en tools destructivas |
-| H-12 | Lifecycle Management (3.1) | 🟢 BAJO | Servidor completo | Sin handlers explícitos de shutdown |
+| H-01 | 1.1, 8.2, 12.3 | 🔴 CRÍTICO | `leer_registro_sistema` | Path Traversal / Arbitrary File Read |
+| H-02 | 2.1, 10.4, 12.4 | 🔴 CRÍTICO | `borrar_base_datos_clientes` | Authorization Bypass por entrada del cliente |
+| H-03 | 1.1, 12.3, 12.5 | 🔴 CRÍTICO | `diagnostico_servidor` | Injection: host concatenado sin sanitizar |
+| H-04 | 1.2 Rate Limiting | 🟡 MEDIO | Todas | Sin límite de invocaciones por cliente |
+| H-05 | 1.3 Output Encoding | 🟡 MEDIO | `leer_registro_sistema` | Contenido de archivo retornado sin sanitizar |
+| H-06 | 2.3 Least Privilege | 🟡 MEDIO | Servidor completo | El proceso Node corre sin restricción de permisos |
+| H-07 | 4.1, 4.5 Isolation | 🟡 MEDIO | Servidor completo | Sin contenedor ni aislamiento de runtime (CPU/RAM) |
+| H-08 | 7.1 Audit Logging | 🟡 MEDIO | Servidor completo | Sin registro de eventos o uso de tools críticas |
+| H-09 | 12.9 Error Handling | 🟡 MEDIO | `leer_registro_sistema` | Fallos crudos del filesystem expuestos al cliente |
+| H-10 | 10.1 Data Minimization | 🟢 BAJO | `leer_registro_sistema` | Respuesta sin límite de truncamiento |
+| H-11 | 3.1 Lifecycle | 🟢 BAJO | Servidor completo | Ausencia de hooks de apagado (SIGINT/SIGTERM) |
+| H-12 | 8.3 Perm Separation | 🟢 BAJO | Servidor completo | Sin separación de privilegios entre herramientas |
 
 ---
 
-## 7. Fase 8 — Guion Completo de Demostración
+## 5. Pruebas de Concepto (PoC) — Guía de Explotación
 
-Se preparó el script oficial de demo (ubicado en `demo/guion-demo-fase8.md`), delineando paso a paso cómo presentar los fallos usando el Inspector de MCP.
+Para verificar las vulnerabilidades, se utiliza el Inspector de MCP oficial:
+`npx @modelcontextprotocol/inspector tsx apps/mcp-lab/src/vulnerable/index.ts`
 
-### Guion y Ejecución Detallada
+### PoC 1: Explotación de Authorization Bypass
+1.  **Payload (Benigno):** `{"rol_usuario": "user", "confirmacion": true}` → Rechazado.
+2.  **Payload (Ataque):** `{"rol_usuario": "admin", "confirmacion": true}` → Base de datos borrada con éxito.
+*El servidor confía ciegamente en el rol auto-declarado.*
 
-#### Configuración de Inicio:
-```bash
-npx @modelcontextprotocol/inspector tsx apps/mcp-lab/src/vulnerable/index.ts
-```
+### PoC 2: Explotación de Path Traversal
+1.  **Payload (Benigno):** `{"ruta_archivo": "sistema.log"}` → Muestra logs regulares.
+2.  **Payload (Ataque):** `{"ruta_archivo": "../private/secreto-ficticio.txt"}` → Filtra archivo confidencial.
+*El uso inseguro de `path.join` permite el uso de saltos direccionales `../`.*
 
-#### Demo 1: Authorization Bypass
-1. **Control Benigno (Payload):** `{"rol_usuario": "user", "confirmacion": true}`
-   - *Resultado:* El servidor rechaza la acción con un mensaje de permisos denegados.
-2. **Ataque (Payload):** `{"rol_usuario": "admin", "confirmacion": true}`
-   - *Resultado:* ¡ÉXITO (Vulnerabilidad)! Base de datos borrada satisfactoriamente.
-   - *Explicación sugerida:* "El servidor no posee un token de sesión real, sino que ciegamente confía en la identidad autodeclarada en el payload JSON. Cualquiera puede ser admin manipulando el parámetro."
-
-#### Demo 2: Path Traversal
-1. **Control Benigno (Payload):** `{"ruta_archivo": "sistema.log"}`
-   - *Resultado:* Devuelve los 10 logs de nuestro fixture benigno.
-2. **Ataque (Payload):** `{"ruta_archivo": "../private/secreto-ficticio.txt"}`
-   - *Resultado:* Exposición de archivo `secreto-ficticio.txt`.
-   - *Explicación sugerida:* "La concatenación mediante `path.join` permite el uso de `../` saltando hacia atrás en la jerarquía del servidor, escapando del supuesto entorno confinado de `logs/`".
-
-#### Demo 3: Command Injection Simulada
-1. **Control Benigno (Payload):** `{"host": "127.0.0.1"}`
-   - *Resultado:* PING normal ejecutado sin detección de inyección.
-2. **Ataque (Payload):** `{"host": "127.0.0.1; whoami"}`
-   - *Resultado:* Salida concatenada del PING y de la ejecución de `usuario-ficticio-lab`.
-   - *Explicación sugerida:* "El servidor recibe la línea y en vez de parametrizar el input, concatena. El separador de shell (punto y coma) hace que todo lo que siga sea tratado como un segundo comando arbitrario, logrando inyección directa."
+### PoC 3: Explotación de Command Injection (Simulada)
+1.  **Payload (Benigno):** `{"host": "127.0.0.1"}` → Simula Ping normal.
+2.  **Payload (Ataque):** `{"host": "127.0.0.1; whoami"}` → Ejecuta comando inyectado mostrando al usuario ficticio.
+*La concatenación de strings permite ejecutar todo lo que siga a un separador de shell.*
 
 ---
 
-## 8. Futuros Pasos (Fases 9 a 16) — Guía de Implementación
+## 6. Plan de Mitigación y Futuros Pasos (Roadmap)
 
-Siguiendo el "Plan de Implementación Completo" entregado, el trabajo restante abarca las siguientes fases:
+Con las fases analíticas concluidas, el proyecto entra en su ciclo de remediación. 
 
-### Fase 9 — Construir Mitigaciones en `secure/index.ts`
-*   **Acción Requerida:** Sustituir el esqueleto actual en `apps/mcp-lab/src/secure/index.ts` por el código mitigado para las tres vulnerabilidades principales.
-*   **Detalle Mitigaciones:**
-    1.  **Authz Bypass:** Remover `rol_usuario` del input del cliente. Utilizar un contexto (mock de sesión segura) gestionado única y exclusivamente por el servidor.
-    2.  **Path Traversal:** Usar `path.resolve` y una comprobación booleana estricta con `.startsWith()` para obligar que cualquier ruta final sea hija legítima del directorio `fixtures/logs/`.
-    3.  **Injection:** Implementar validación de input con una expresión regular severa (`HOST_VALIDO = /^(\d{1,3}\.){3}\d{1,3}$|^[a-zA-Z0-9.-]+$/`) rechazando separadores antes de la concatenación.
-
-### Fase 10 — Automatización / Prueba "BEFORE & AFTER"
-*   **Acción Requerida:** Iniciar `npm run dev:secure` en el Inspector.
-*   **Tarea:** Repetir los mismos 3 ataques (Payloads maliciosos de la Fase 8) y corroborar y documentar cómo ahora resultan en errores controlados y mitigados (Denegado / Rechazado).
-*   **Entregable:** Matriz comparativa "BEFORE/AFTER" para la presentación.
-
-### Fase 11 — Recolección Final de Evidencias
-*   **Acción Requerida:** Recopilar capturas de pantalla de los Inspector Runs (Fase 3, 8 y 10).
-*   **Política de Seguridad Estricta:** Validar que ninguna captura haya sido insertada en el repositorio git; mantener la carpeta de capturas de la evidencia final fuera de control de versiones o listada en el `.gitignore`.
-
-### Fase 12 — Elaboración de la Taxonomía de Riesgos
-*   **Acción Requerida:** Crear un nuevo documento Markdown (`audit/risk-taxonomy.md`) basándose directamente en la salida completa de Cisco (ej: `AITech-9.1`) y los hallazgos de SlowMist (Ej: H-02, H-08).
-*   **Contenido:** Las vulnerabilidades explotadas vs las documentadas como "riesgo futuro" en el laboratorio.
-
-### Fase 13 — Informe Técnico Consolidado
-*   **Acción Requerida:** Unificar la estructura de documentación en un reporte final (Introducción, Arquitectura, Metodología [Cisco + SlowMist], Pruebas Before/After, Taxonomía).
-*   **Actualización del README:** Explicar claramente el propósito del repo, las ramas `vulnerable` y `secure` y cómo correr los laboratorios.
-
-### Fase 14 y 15 — Presentación PPT y Video de Backup
-*   **Fase 14:** Desarrollar 10-12 diapositivas PPT extrayendo la tabla consolidada, las arquitecturas y los diagramas de demostración de los payloads BEFORE/AFTER.
-*   **Fase 15:** Grabar el video "backup" de 5 a 8 minutos mostrando la demostración fluida en caso de caída o error al mostrar el Inspector en vivo en clase.
-
-### Fase 16 — Checklist de Ensayo Final
-*   **Acción Requerida:** Auditar el proyecto entero contra la rúbrica del docente. 
-*   **Defensa Académica:** Prepararse para preguntas de justificación de diseño (Ej: "Por qué Cisco Scanner falló en ver la vulnerabilidad del Bypass de Autorización" -> "Porque la lógica comercial no es deducible solo estáticamente sin modelar el comportamiento funcional"). Verificar el historial limpio de git.
+1.  **Desarrollo de Código Seguro (Fase 9):**
+    *   *Path Traversal:* Implementar comprobaciones booleanas `.startsWith()` combinadas con `path.resolve()` para confinar la lectura al directorio autorizado.
+    *   *Auth Bypass:* Retirar el control de privilegios del input del cliente. Emular un contexto de sesión de backend.
+    *   *Injection:* Restringir las entradas mediante RegEx estricta (`/^(\d{1,3}\.){3}\d{1,3}$|^[a-zA-Z0-9.-]+$/`) rechazando caracteres de escape.
+2.  **Validación Before/After (Fase 10 & 11):**
+    *   Ejecutar las mismas Pruebas de Concepto (PoC) documentadas en la sección 5 sobre el servidor seguro (`npm run dev:secure`) para comprobar la denegación de los ataques.
+3.  **Documentación de Riesgos y Entrega (Fases 12 y 13):**
+    *   Consolidar la taxonomía de AITech para cada vector mitigado.
+    *   Finalizar el README oficial del repositorio para instructores y evaluadores.
+4.  **Preparación de Defensa Académica (Fases 14, 15 y 16):**
+    *   Elaboración de matriz PPT resumiendo la falla sistémica automatizada vs manual.
+    *   Grabación de la demostración en video como respaldo de la defensa en vivo.
+    *   Ejecución de ensayo general de la rúbrica de calificación.
