@@ -39,6 +39,19 @@
           }
         }
       }
+    },
+    {
+      "name": "diagnostico_servidor",
+      "description": "[VULNERABLE] Ejecuta un diagnóstico de red (ping simulado) a partir del host indicado.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "host": {
+            "type": "string",
+            "description": "Host o IP a diagnosticar (ej. \"127.0.0.1\")"
+          }
+        }
+      }
     }
   ]
 }

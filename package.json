@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "description": "Laboratorio académico de seguridad para servidores MCP",
   "scripts": {
-    "dev": "tsx apps/mcp-lab/src/index.ts",
+    "dev": "npm run dev:vulnerable",
+    "dev:vulnerable": "tsx apps/mcp-lab/src/vulnerable/index.ts",
+    "dev:secure": "tsx apps/mcp-lab/src/secure/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "repository": {
