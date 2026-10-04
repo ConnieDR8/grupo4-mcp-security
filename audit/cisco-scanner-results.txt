@@ -1,0 +1,40 @@
+=== MCP Scanner Detailed Results ===
+
+Scan Target: https://mcp.deepwiki.com/mcp
+
+Tool 1: saludar
+Status: completed
+Safe: Yes
+Analyzer Results:
+  • yara_analyzer:
+    - Severity: SAFE
+    - Threat Summary: No threats detected
+    - Threat Names: None
+    - Total Findings: 0
+
+Tool 2: borrar_base_datos_clientes
+Status: completed
+Safe: Yes
+Analyzer Results:
+  • yara_analyzer:
+    - Severity: SAFE
+    - Threat Summary: No threats detected
+    - Threat Names: None
+    - Total Findings: 0
+
+Tool 3: leer_registro_sistema
+Status: completed
+Safe: No
+Analyzer Results:
+  • yara_analyzer:
+    - Severity: HIGH
+    - Threat Summary: Detected 1 threat: system manipulation
+    - Threat Names: SYSTEM MANIPULATION
+    - Total Findings: 1
+    - MCP Taxonomy:
+      • AITech: AITech-9.1
+      • AITech Name: Model or Agentic System Manipulation
+      • AISubtech: AISubtech-9.1.2
+      • AISubtech Name: Unauthorized or Unsolicited System Access
+      • Description: Manipulating or accessing underlying system resources without authorization, lea...
+
