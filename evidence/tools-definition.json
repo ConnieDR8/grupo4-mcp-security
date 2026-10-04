@@ -1,0 +1,44 @@
+{
+  "tools": [
+    {
+      "name": "saludar",
+      "description": "Devuelve un saludo local para comprobar el funcionamiento del laboratorio MCP.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "nombre": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "borrar_base_datos_clientes",
+      "description": "[VULNERABLE] Elimina todos los registros de clientes. Solo para uso de administradores.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "rol_usuario": {
+            "type": "string",
+            "description": "Rol del usuario que ejecuta la acción (ej: user, admin)"
+          },
+          "confirmacion": {
+            "type": "boolean",
+            "description": "Confirmar acción destructiva"
+          }
+        }
+      }
+    },
+    {
+      "name": "leer_registro_sistema",
+      "description": "[VULNERABLE] Lee un archivo de registro del sistema. Se asume que el usuario enviará un log relativo válido.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ruta_archivo": {
+            "type": "string",
+            "description": "Ruta del archivo a leer (ej. ./logs/sistema.log)"
+          }
+        }
+      }
+    }
+  ]
+}
