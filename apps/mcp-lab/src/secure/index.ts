@@ -12,14 +12,37 @@ const SERVER_NAME = 'grupo4-mcp-lab-secure';
 const SERVER_VERSION = '0.1.0';
 
 /*
- * Sesión simulada controlada por el servidor.
+ * MODELO DE CONFIANZA DEL LABORATORIO
  *
- * En la versión vulnerable, el cliente podía enviar su propio rol.
- * En esta versión segura, la autorización depende de información
- * mantenida por el servidor.
+ * - MCP Client / Host / agente IA:
+ *   fuente no confiable de argumentos enviados a las Tools.
  *
- * En producción, esta información debería provenir de una sesión
- * autenticada o de un token validado por el backend.
+ * - MCP Server:
+ *   responsable de validar inputs y aplicar autorización.
+ *
+ * - Fixtures:
+ *   datos ficticios y controlados exclusivamente para el laboratorio.
+ *
+ * - No existen usuarios, credenciales ni sistemas reales.
+ *
+ * El objetivo es demostrar que una Tool MCP no debe confiar en
+ * privilegios o instrucciones proporcionados por su consumidor.
+ */
+
+/*
+ * Contexto de autorización simulado del lado servidor.
+ *
+ * En la versión vulnerable, el cliente podía indicar directamente
+ * su propio rol mediante el parámetro "rol_usuario".
+ *
+ * En esta versión segura, dicho rol desaparece del inputSchema.
+ *
+ * Como este laboratorio utiliza transporte stdio y no implementa
+ * un proveedor de identidad real, usuario y rol se reciben mediante
+ * variables de entorno configuradas al iniciar el MCP Server.
+ *
+ * En producción, estos datos deberían derivarse de una identidad
+ * previamente autenticada y validada.
  */
 type RolServidor = 'user' | 'admin';
 
@@ -28,10 +51,26 @@ interface SesionServidor {
   rol: RolServidor;
 }
 
-const SESION_SERVIDOR: SesionServidor = {
-  usuario: 'usuario-ficticio-01',
-  rol: 'user',
-};
+function obtenerSesionServidor(): SesionServidor {
+  const usuario =
+    process.env.MCP_LAB_USER?.trim() || 'usuario-ficticio-01';
+
+  const rolConfigurado =
+    process.env.MCP_LAB_ROLE?.trim().toLowerCase() || 'user';
+
+  if (rolConfigurado !== 'user' && rolConfigurado !== 'admin') {
+    throw new Error(
+      'Configuración inválida: MCP_LAB_ROLE debe ser "user" o "admin".',
+    );
+  }
+
+  return {
+    usuario,
+    rol: rolConfigurado,
+  };
+}
+
+const SESION_SERVIDOR = obtenerSesionServidor();
 
 const LAB_INFO = {
   project: 'grupo4-mcp-security',
@@ -101,10 +140,15 @@ function createServer(): McpServer {
   /*
    * MITIGACIÓN 1 — AUTHORIZATION BYPASS
    *
-   * El cliente ya no puede indicar rol_usuario.
-   * La decisión de autorización se toma usando SESION_SERVIDOR,
-   * que representa una identidad previamente autenticada y
-   * validada por el backend.
+   * En la versión vulnerable, el cliente podía proporcionar
+   * directamente su propio rol mediante "rol_usuario".
+   *
+   * En esta versión segura, el rol desaparece completamente del
+   * inputSchema. La decisión de autorización utiliza exclusivamente
+   * el contexto mantenido por el servidor.
+   *
+   * Así, un Client/Host —o un agente IA que invoque esta Tool—
+   * no puede elevar sus privilegios modificando los argumentos MCP.
    */
   server.registerTool(
     'borrar_base_datos_clientes',
@@ -137,7 +181,7 @@ function createServer(): McpServer {
               type: 'text',
               text:
                 `Acceso denegado para ${SESION_SERVIDOR.usuario}: ` +
-                'la sesión autenticada no posee el rol admin.',
+                'el contexto de autorización no posee el rol admin.',
             },
           ],
         };
@@ -160,6 +204,7 @@ function createServer(): McpServer {
    * MITIGACIÓN 2 — PATH TRAVERSAL / ARBITRARY FILE READ
    *
    * Los archivos permitidos deben permanecer dentro de:
+   *
    * fixtures/logs/
    *
    * path.resolve() normaliza la ruta y path.relative() permite
@@ -246,7 +291,7 @@ function createServer(): McpServer {
    *
    * La versión vulnerable construía una línea similar a:
    *
-   *   ping -c 1 ${host}
+   * ping -c 1 ${host}
    *
    * y simulaba su interpretación como shell.
    *
@@ -355,5 +400,6 @@ function createServer(): McpServer {
 void serveStdio(createServer);
 
 console.error(
-  `${SERVER_NAME} v${SERVER_VERSION} ejecutándose mediante stdio.`,
+  `${SERVER_NAME} v${SERVER_VERSION} ejecutándose mediante stdio. ` +
+    `Contexto: usuario=${SESION_SERVIDOR.usuario}, rol=${SESION_SERVIDOR.rol}.`,
 );

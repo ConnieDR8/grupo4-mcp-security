@@ -331,3 +331,22 @@ El escaneo previo con Cisco MCP Scanner (modo estático) demostró un punto cieg
 
 **Conclusión final de la auditoría:**  
 La presente matriz cubre el **100% de los controles dictaminados por el framework SlowMist**. Su aplicación rigurosa ha permitido localizar fallos de seguridad críticos de Inyección, Control de Acceso y Navegación de Directorios que escaparon a las herramientas automatizadas, probando que el análisis de contexto funcional y humano sigue siendo insustituible para servicios LLM/MCP.
+
+
+## Respuesta de Mitigación — Fase 9
+
+La auditoría SlowMist corresponde a la versión vulnerable del laboratorio, por lo que los estados registrados en la matriz se mantienen como evidencia del estado inicial.
+
+La Fase 9 implementa mitigaciones específicas para las tres vulnerabilidades críticas demostradas:
+
+| Hallazgo | Vulnerabilidad | Mitigación |
+|---|---|---|
+| **H-01** | Path Traversal / Arbitrary File Read | Normalización mediante `path.resolve()` y comprobación del límite autorizado mediante `path.relative()`. |
+| **H-02** | Authorization Bypass | Eliminación de `rol_usuario` del `inputSchema` y uso de un contexto de autorización controlado del lado servidor. |
+| **H-03** | Injection simulada | Validación estricta de IP/hostname y eliminación de la interpretación de instrucciones adicionales. |
+
+Para el modelo de confianza del laboratorio, los argumentos recibidos por las Tools se consideran entrada no confiable, ya procedan de MCP Inspector, de un MCP Client o potencialmente de una aplicación/agente IA.
+
+El contexto utilizado para H-02 es una simulación académica y no constituye autenticación de producción. En un sistema real, identidad y permisos deberían derivarse de credenciales previamente autenticadas y validadas.
+
+La Fase 9 no pretende corregir todos los controles SlowMist. Aspectos como rate limiting, logging persistente, alertas, sandboxing, límites de recursos y separación de permisos por Tool permanecen documentados como hardening futuro.
