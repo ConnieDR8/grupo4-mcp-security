@@ -17,6 +17,10 @@ __pycache__/
 
 # Logs y archivos temporales
 *.log
+# Fixture ficticio necesario para el laboratorio MCP
+!apps/mcp-lab/fixtures/logs/
+!apps/mcp-lab/fixtures/logs/sistema.log
+
 tmp/
 temp/
 
