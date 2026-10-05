@@ -152,7 +152,6 @@ function createServer(): McpServer {
   // VULNERABILIDAD 3: Injection (simulada, sin ejecución real de procesos)
   const RESPUESTAS_SIMULADAS: Record<string, string> = {
     whoami: 'usuario-ficticio-lab',
-    'cat secreto-ficticio.txt': '[contenido ficticio: ver fixtures/private/secreto-ficticio.txt]',
     id: 'uid=1000(usuario-ficticio) gid=1000(lab)',
   };
 

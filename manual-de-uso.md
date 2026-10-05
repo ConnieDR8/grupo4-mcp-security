@@ -79,3 +79,46 @@ A continuación, se detallan los payloads JSON que debes introducir en el Inspec
       "host": "127.0.0.1; whoami"
     }
     ```
+
+  ---
+
+## 3. Validación de Mitigaciones — Servidor Seguro
+
+La versión segura del laboratorio permite repetir los mismos vectores utilizados contra el servidor vulnerable y comprobar que las tres vulnerabilidades críticas ya no pueden reproducirse.
+
+Para iniciar el servidor seguro mediante MCP Inspector:
+
+```bash
+npx @modelcontextprotocol/inspector tsx apps/mcp-lab/src/secure/index.ts
+```
+  ### 3.1 Mitigación de Authorization Bypass
+
+En la versión vulnerable, el rol forma parte del `inputSchema` de la Tool:
+
+`rol_usuario`
+
+Por ello, el consumidor MCP puede modificar el mismo dato que el servidor utiliza para tomar una decisión de autorización.
+
+En la versión segura, `rol_usuario` se elimina completamente del payload. El laboratorio obtiene un contexto de autorización simulado mediante variables de entorno configuradas al iniciar el servidor:
+
+- `MCP_LAB_USER`
+- `MCP_LAB_ROLE`
+
+Estas variables representan únicamente el contexto confiable del lado servidor en este laboratorio académico. No constituyen un sistema de autenticación de producción.
+
+#### Contexto de usuario normal
+
+```powershell
+npx @modelcontextprotocol/inspector `
+  -e MCP_LAB_USER=usuario-ficticio-01 `
+  -e MCP_LAB_ROLE=user `
+  tsx apps/mcp-lab/src/secure/index.ts
+```
+
+#### Contexto de admin
+```powershell
+npx @modelcontextprotocol/inspector `
+  -e MCP_LAB_USER=admin-ficticio-01 `
+  -e MCP_LAB_ROLE=admin `
+  tsx apps/mcp-lab/src/secure/index.ts
+```
