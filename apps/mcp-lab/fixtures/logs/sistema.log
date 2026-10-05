@@ -1,0 +1,10 @@
+﻿[2026-10-01 08:12:03] INFO  sistema iniciado correctamente
+[2026-10-01 08:14:51] INFO  usuario-ficticio-01 inició sesión
+[2026-10-01 09:02:10] WARN  intento de acceso a recurso restringido (bloqueado)
+[2026-10-01 10:45:22] INFO  tarea programada 'backup-nocturno' completada
+[2026-10-01 11:30:00] ERROR conexión perdida con servicio-ficticio-pagos (timeout)
+[2026-10-01 12:00:00] INFO  reconexión exitosa con servicio-ficticio-pagos
+[2026-10-01 13:15:44] WARN  usuario-ficticio-02 realizó 3 intentos de acceso fallidos
+[2026-10-01 14:22:09] INFO  tarea programada 'limpieza-tmp' completada
+[2026-10-01 15:45:00] INFO  sesión de usuario-ficticio-01 cerrada
+[2026-10-01 23:59:59] INFO  fin de jornada — sistema en espera
